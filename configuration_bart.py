@@ -23,11 +23,11 @@ from transformers.configuration_utils import PretrainedConfig
 logger = logging.getLogger(__name__)
 
 BART_PRETRAINED_CONFIG_ARCHIVE_MAP = {
-    "bart-large": "https://s3.amazonaws.com/models.huggingface.co/bert/facebook/bart-large/config.json",
-    "bart-large-mnli": "https://s3.amazonaws.com/models.huggingface.co/bert/facebook/bart-large-mnli/config.json",
-    "bart-large-cnn": "https://s3.amazonaws.com/models.huggingface.co/bert/facebook/bart-large-cnn/config.json",
-    "bart-large-xsum": "https://s3.amazonaws.com/models.huggingface.co/bert/facebook/bart-large-xsum/config.json",
-    "mbart-large-en-ro": "https://s3.amazonaws.com/models.huggingface.co/bert/facebook/mbart-large-en-ro/config.json",
+    "facebook/bart-large": "https://s3.amazonaws.com/models.huggingface.co/bert/facebook/bart-large/config.json",
+    "facebook/bart-large-mnli": "https://s3.amazonaws.com/models.huggingface.co/bert/facebook/bart-large-mnli/config.json",
+    "facebook/bart-large-cnn": "https://s3.amazonaws.com/models.huggingface.co/bert/facebook/bart-large-cnn/config.json",
+    "facebook/bart-large-xsum": "https://s3.amazonaws.com/models.huggingface.co/bert/facebook/bart-large-xsum/config.json",
+    "facebook/mbart-large-en-ro": "https://s3.amazonaws.com/models.huggingface.co/bert/facebook/mbart-large-en-ro/config.json",
 }
 
 
@@ -36,7 +36,6 @@ class BartConfig(PretrainedConfig):
         Configuration class for Bart. Parameters are renamed from the fairseq implementation
     """
     model_type = "bart"
-    pretrained_config_archive_map = BART_PRETRAINED_CONFIG_ARCHIVE_MAP
 
     def __init__(
         self,
@@ -55,8 +54,6 @@ class BartConfig(PretrainedConfig):
         attention_dropout=0.0,
         dropout=0.1,
         max_position_embeddings=1024,
-        encoder_max_position_embeddings=None,
-        decoder_max_position_embeddings=None,
         init_std=0.02,
         classifier_dropout=0.0,
         num_labels=3,
@@ -98,12 +95,9 @@ class BartConfig(PretrainedConfig):
         self.decoder_ffn_dim = decoder_ffn_dim
         self.decoder_layers = decoder_layers
         self.decoder_attention_heads = decoder_attention_heads
+        self.max_position_embeddings = max_position_embeddings
         self.init_std = init_std  # Normal(0, this parameter)
         self.activation_function = activation_function
-
-        self.max_position_embeddings = max_position_embeddings
-        self.encoder_max_position_embeddings = encoder_max_position_embeddings if encoder_max_position_embeddings else max_position_embeddings
-        self.decoder_max_position_embeddings = decoder_max_position_embeddings if decoder_max_position_embeddings else max_position_embeddings
 
         # Params introduced for Mbart
         self.scale_embedding = scale_embedding  # scale factor will be sqrt(d_model) if True
