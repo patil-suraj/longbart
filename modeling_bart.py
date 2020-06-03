@@ -20,6 +20,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
+import torch.utils.checkpoint
 import torch.nn.functional as F
 from torch import Tensor, nn
 
@@ -228,7 +229,7 @@ class EncoderLayer(nn.Module):
         x = residual + x
         if not self.normalize_before:
             x = self.final_layer_norm(x)
-        return x, attn_weights
+        return (x, attn_weights)
 
 
 class BartEncoder(nn.Module):
@@ -242,7 +243,7 @@ class BartEncoder(nn.Module):
 
     def __init__(self, config: BartConfig, embed_tokens):
         super().__init__()
-
+        self.config = config
         self.dropout = config.dropout
         self.layerdrop = config.encoder_layerdrop
         self.output_attentions = config.output_attentions
@@ -307,7 +308,15 @@ class BartEncoder(nn.Module):
             if self.training and (dropout_probability < self.layerdrop):  # skip the layer
                 attn = None
             else:
-                x, attn = encoder_layer(x, attention_mask)
+                if getattr(self.config, "gradient_checkpointing", False):
+                    x, attn = torch.utils.checkpoint.checkpoint(
+                        encoder_layer,
+                        x,
+                        attention_mask
+                    )
+                else:
+                    x, attn = encoder_layer(x, attention_mask)
+
 
             if self.output_attentions:
                 all_attentions.append(attn)
@@ -424,6 +433,7 @@ class BartDecoder(nn.Module):
 
     def __init__(self, config: BartConfig, embed_tokens: nn.Embedding):
         super().__init__()
+        self.config = config
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
         self.dropout = config.dropout
@@ -510,14 +520,25 @@ class BartDecoder(nn.Module):
 
             layer_state = decoder_cached_states[idx] if decoder_cached_states is not None else None
 
-            x, layer_self_attn, layer_past = decoder_layer(
-                x,
-                encoder_hidden_states,
-                encoder_attn_mask=encoder_padding_mask,
-                decoder_padding_mask=decoder_padding_mask,
-                layer_state=layer_state,
-                causal_mask=decoder_causal_mask,
-            )
+            if getattr(self.config, "gradient_checkpointing", False):
+                x, layer_self_attn, layer_past = torch.utils.checkpoint.checkpoint(
+                    decoder_layer,
+                    x,
+                    encoder_hidden_states,
+                    encoder_attn_mask=encoder_padding_mask,
+                    decoder_padding_mask=decoder_padding_mask,
+                    layer_state=layer_state,
+                    causal_mask=decoder_causal_mask,
+                )
+            else:
+                x, layer_self_attn, layer_past = decoder_layer(
+                    x,
+                    encoder_hidden_states,
+                    encoder_attn_mask=encoder_padding_mask,
+                    decoder_padding_mask=decoder_padding_mask,
+                    layer_state=layer_state,
+                    causal_mask=decoder_causal_mask,
+                )
 
             if use_cache:
                 next_decoder_cache.append(layer_past.copy())

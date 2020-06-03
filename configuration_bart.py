@@ -69,6 +69,7 @@ class BartConfig(PretrainedConfig):
         normalize_embedding=True,
         static_position_embeddings=False,
         add_bias_logits=False,
+        gradient_checkpointing=False,
         **common_kwargs
     ):
         r"""
@@ -121,6 +122,9 @@ class BartConfig(PretrainedConfig):
 
         # Classifier stuff
         self.classif_dropout = classifier_dropout
+        
+        # gradient_checkpointing
+        self.gradient_checkpointing = gradient_checkpointing
 
     @property
     def num_attention_heads(self) -> int:
