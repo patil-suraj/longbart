@@ -4,7 +4,7 @@ from torch import Tensor, nn
 
 from transformers.modeling_longformer import LongformerSelfAttention
 
-from modeling_bart import BartForConditionalGeneration
+from .modeling_bart import BartForConditionalGeneration
 
 class LongBartForConditionalGeneration(BartForConditionalGeneration):
     def __init__(self, config):

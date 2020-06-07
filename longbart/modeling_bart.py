@@ -28,7 +28,7 @@ from transformers.activations import ACT2FN
 from transformers.file_utils import add_start_docstrings, add_start_docstrings_to_callable
 from transformers.modeling_utils import PreTrainedModel, create_position_ids_from_input_ids
 
-from configuration_bart import BartConfig
+from .configuration_bart import BartConfig
 
 logger = logging.getLogger(__name__)
 
