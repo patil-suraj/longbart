@@ -125,6 +125,7 @@ class BartConfig(PretrainedConfig):
         
         # gradient_checkpointing
         self.gradient_checkpointing = gradient_checkpointing
+        self.output_attentions = True
 
     @property
     def num_attention_heads(self) -> int:
