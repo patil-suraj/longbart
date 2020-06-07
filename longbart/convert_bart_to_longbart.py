@@ -1,16 +1,24 @@
+import argparse
 import logging
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+import os
 
 from transformers import BartTokenizer
 
-from modeling_bart import BartForConditionalGeneration
+from .modeling_bart import BartForConditionalGeneration
+from .modeling_longbart import LongformerSelfAttentionForBart 
 
-from longbart import LongformerSelfAttentionForBart
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
-def create_long_model(save_model_to, base_model='bart-large', attention_window=512, max_pos=4096):
+def create_long_model(
+    save_model_to, 
+    base_model='facebook/bart-large',
+    tokenizer_name_or_path='facebook/bart-large',
+    attention_window=1024,
+    max_pos=4096
+):
     model = BartForConditionalGeneration.from_pretrained(base_model)
-    tokenizer = BartTokenizer.from_pretrained('bart-large', model_max_length=max_pos)
+    tokenizer = BartTokenizer.from_pretrained(tokenizer_name_or_path, model_max_length=max_pos)
     config = model.config
 
     # in BART attention_probs_dropout_prob is attention_dropout, but LongformerSelfAttention
@@ -56,3 +64,54 @@ def create_long_model(save_model_to, base_model='bart-large', attention_window=5
     model.save_pretrained(save_model_to)
     tokenizer.save_pretrained(save_model_to)
     return model, tokenizer
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Convert BART to LongBART. Replaces BART encoder's SelfAttnetion with LongformerSelfAttention")
+    parser.add_argument(
+        'base_model',
+        type=str,
+        default='facebook/bart-large',
+        help='The name or path of the base model you want to convert'
+    )
+    parser.add_argument(
+        'tokenizer_name_or_path',
+        type=str,
+        default='facebook/bart-large',
+        help='The name or path of the tokenizer'
+    )
+    parser.add_argument(
+        'save_model_to',
+        type=str,
+        required=True,
+        help='The path to save the converted model'
+    )
+    parser.add_argument(
+        'attention_window',
+        type=int,
+        default=1024,
+        help='attention window size for longformer self attention'
+    )
+    parser.add_argument(
+        'max_pos',
+        type=int,
+        default=4096,
+        help='maximum encoder positions'
+    )
+
+    args = parser.parse_args()
+
+    if not os.path.exists(args.save_model_to):
+        os.mkdir(args.save_model_to)
+    
+    create_long_model(
+        save_model_to=args.save_model_to,
+        base_model=args.base_model,
+        tokenizer_name_or_path=args.tokenizer_name_or_path,
+        attention_window=args.attention_window,
+        max_pos=args.max_pos
+    )
+
+
+if __name__ == "__main__":
+    main()

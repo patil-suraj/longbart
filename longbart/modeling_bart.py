@@ -394,7 +394,7 @@ class DecoderLayer(nn.Module):
             query=x,
             key=encoder_hidden_states,
             key_padding_mask=encoder_attn_mask,
-            layer_state=layer_state,  # mutates layer state
+            layer_state=layer_state_,  # mutates layer state
         )
         x = F.dropout(x, p=self.dropout, training=self.training)
         x = residual + x
