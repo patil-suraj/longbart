@@ -337,7 +337,6 @@ class DecoderLayer(nn.Module):
     def __init__(self, config: BartConfig):
         super().__init__()
         self.embed_dim = config.d_model
-        self.output_attentions = config.output_attentions
         self.self_attn = SelfAttention(
             embed_dim=self.embed_dim, num_heads=config.decoder_attention_heads, dropout=config.attention_dropout,
         )
@@ -363,11 +362,15 @@ class DecoderLayer(nn.Module):
         x,
         encoder_hidden_states,
         encoder_attn_mask=None,
+        layer_state=None,
         causal_mask=None,
         decoder_padding_mask=None,
+        output_attentions=False,
     ):
         residual = x
 
+        if layer_state is None:
+            layer_state = {}
         if self.normalize_before:
             x = self.self_attn_layer_norm(x)
         # Self Attention
@@ -375,10 +378,10 @@ class DecoderLayer(nn.Module):
         x, self_attn_weights = self.self_attn(
             query=x,
             key=x,
-            layer_state=layer_state_,  # adds keys to layer state
+            layer_state=layer_state,  # adds keys to layer state
             key_padding_mask=decoder_padding_mask,
             attn_mask=causal_mask,
-            need_weights=self.output_attentions,
+            output_attentions=output_attentions,
         )
         x = F.dropout(x, p=self.dropout, training=self.training)
         x = residual + x
@@ -394,7 +397,7 @@ class DecoderLayer(nn.Module):
             query=x,
             key=encoder_hidden_states,
             key_padding_mask=encoder_attn_mask,
-            layer_state=layer_state_,  # mutates layer state
+            layer_state=layer_state,  # mutates layer state
         )
         x = F.dropout(x, p=self.dropout, training=self.training)
         x = residual + x
@@ -412,10 +415,10 @@ class DecoderLayer(nn.Module):
         x = residual + x
         if not self.normalize_before:
             x = self.final_layer_norm(x)
-        
         return (
             x,
             self_attn_weights,
+            layer_state,
         )  # just self_attn weights for now, following t5, layer_state = cache for decoding
 
 
@@ -430,8 +433,6 @@ class BartDecoder(nn.Module):
 
     def __init__(self, config: BartConfig, embed_tokens: nn.Embedding):
         super().__init__()
-        self.config = config
-        self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
         self.dropout = config.dropout
         self.layerdrop = config.decoder_layerdrop
@@ -462,7 +463,8 @@ class BartDecoder(nn.Module):
         decoder_causal_mask,
         decoder_cached_states=None,
         use_cache=False,
-        **unused
+        output_attentions=False,
+        **unused,
     ):
         """
         Includes several features from "Jointly Learning to Align and
@@ -514,39 +516,25 @@ class BartDecoder(nn.Module):
             dropout_probability = random.uniform(0, 1)
             if self.training and (dropout_probability < self.layerdrop):
                 continue
-            
 
-            # make this gloabl to allow gradient checkpointing
-            # because gradient checkpointing doesn't allow to pass any type other than Tensor
-            # layer_state_ will be mutated by the decoder layer
-            # TODO: find a better solution for this
-            global layer_state_ 
-            layer_state_ = decoder_cached_states[idx] if decoder_cached_states is not None else {}
-            
-            if getattr(self.config, "gradient_checkpointing", False):
-                x, layer_self_attn = torch.utils.checkpoint.checkpoint(
-                    decoder_layer,
-                    x,
-                    encoder_hidden_states,
-                    encoder_padding_mask,
-                    decoder_causal_mask,
-                    decoder_padding_mask,
-                )
-            else:
-                x, layer_self_attn = decoder_layer(
-                    x,
-                    encoder_hidden_states,
-                    encoder_attn_mask=encoder_padding_mask,
-                    decoder_padding_mask=decoder_padding_mask,
-                    causal_mask=decoder_causal_mask,
-                )
+            layer_state = decoder_cached_states[idx] if decoder_cached_states is not None else None
+
+            x, layer_self_attn, layer_past = decoder_layer(
+                x,
+                encoder_hidden_states,
+                encoder_attn_mask=encoder_padding_mask,
+                decoder_padding_mask=decoder_padding_mask,
+                layer_state=layer_state,
+                causal_mask=decoder_causal_mask,
+                output_attentions=output_attentions,
+            )
 
             if use_cache:
-                next_decoder_cache.append(layer_state_.copy())
+                next_decoder_cache.append(layer_past.copy())
 
             if self.layer_norm and (idx == len(self.layers) - 1):  # last layer of mbart
                 x = self.layer_norm(x)
-            if self.output_attentions:
+            if output_attentions:
                 all_self_attns += (layer_self_attn,)
 
         # Convert to standard output format: (seq_len, BS, model_dim) -> (BS, seq_len, model_dim)
