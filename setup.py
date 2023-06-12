@@ -10,7 +10,7 @@ setup(
     packages=['longbart'],
     keywords="NLP deep learning transformer pytorch bart",
     install_requires=[
-        'transformers == 2.11.0'
+        'transformers == 4.30.0'
     ],
     python_requires=">=3.6.0",
     classifiers=[
